@@ -1,16 +1,18 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
-using Newtonsoft.Json;          //JSON ¶óÀÌºê·¯¸® Ãß°¡
-using System;       //Action<> »ç¿ëÀ» À§ÇÑ ³×ÀÓ½ºÆäÀÌ½º Ãß°¡
+using Newtonsoft.Json;          //JSON ë¼ì´ë¸ŒëŸ¬ë¦¬ ì¶”ê°€
+using System;
+using UnityEngine.Rendering;
+using UnityEditor.Compilation;
+using Unity.VisualScripting;       //Action<> ì‚¬ìš©ì„ ìœ„í•œ ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ì¶”ê°€
 
 public class GameAPI : MonoBehaviour
 {
-    private string baseUrl = "http://localhost:4000/api";  //Node.js ¼­¹öÀÇ URL
-
-    //ÇÃ·¹ÀÌ¾î µî·Ï ¸Ş¼­µå
+    private string baseUrl = "http://localhost:4000/api";   //Node.js ì„œë²„ì˜ URL
+    //ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ ï¿½Ş¼ï¿½ï¿½ï¿½
     public IEnumerator RegisterPlayer(string playerName, string password)
     {
         var requestData = new { name = playerName, password = password };
@@ -37,7 +39,7 @@ public class GameAPI : MonoBehaviour
         }
     }
 
-    //ÇÃ·¹ÀÌ¾î ·Î±×ÀÎ ¸Ş¼­µå
+    //í”Œë ˆì´ì–´ ë¡œê·¸ì¸ ë©”ì„œë“œ
     public IEnumerator LoginPlayer(string playerName, string password, Action<PlayerModel> onSuccess)
     {
         var requestData = new { name = playerName, password = password };
@@ -52,32 +54,77 @@ public class GameAPI : MonoBehaviour
 
             yield return request.SendWebRequest();
 
-            if (request.result != UnityWebRequest.Result.Success)       //½ÇÆĞ ¿¡·¯
+            if (request.result != UnityWebRequest.Result.Success)       //ì‹¤íŒ¨ ì˜ˆëŸ¬
             {
-                Debug.LogError($"Error loging in : {request.error}");   //¿¡·¯ ·Î±×
+                Debug.LogError($"Error loging in : {request.error}");   //ì—ëŸ¬ ë¡œê·¸
             }
             else
             {
-                //ÀÀ´äÀ» Ã³¸®ÇÏ¿© PlayerModel »ı¼º
+                //ì‘ë‹µì„ ì²˜ë¦¬í•˜ì—¬ PlayerModel ìƒì„±   
                 string responseBody = request.downloadHandler.text;
 
                 try
                 {
-                    var responseData = JsonConvert.DeserializeObject<Dictionary<string,object>>(responseBody);
+                    var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseBody);
 
-                    //¼­¹ö ÀÀ´ä¿¡¼­ PlayerModel »ı¼º
+                    //ì„œë²„ ì‘ë‹µì—ì„œ PlayerModel ìƒì„±
                     PlayerModel playerModel = new PlayerModel(responseData["playerName"].ToString())
                     {
                         metal = Convert.ToInt32(responseData["metal"]),
                         crystal = Convert.ToInt32(responseData["crystal"]),
-                        deuterium = Convert.ToInt32(responseData["deuteriurm"]),
+                        deuterium = Convert.ToInt32(responseData["deuterium"]),
                         Planets = new List<PlanetModel>()
                     };
 
-                    onSuccess?.Invoke(playerModel); //PlayerModel ¹İÈ¯
+                    onSuccess?.Invoke(playerModel); //PlayerModel ë°˜í™˜
                     Debug.Log("Login successful");
                 }
-                catch (Exception ex) 
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Error processing login response: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    //í”Œë ˆì´ì–´ ë“±ë¡ ë©”ì„œë“œ
+    public IEnumerator CollectResources(string playerName, Action<PlayerModel> onSuccess)
+    {
+        using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}/collect/{playerName}", "POST"))
+        {
+            string jsonData = JsonConvert.SerializeObject(new { });         //ë¹ˆ JSON ê°ì²´
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)        //ì‹¤íŒ¨ ì˜ˆëŸ¬
+            {
+                Debug.LogError($"Error loging in : {request.error}");   //ì—ëŸ¬ ë¡œê·¸
+            }
+            else
+            {
+                //ì‘ë‹µì„ ì²˜ë¦¬í•˜ì—¬ PlayerModel ìƒì„±
+                string responseBody = request.downloadHandler.text;
+
+                try
+                {
+                    var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseBody);
+
+                    //ì„œë²„ ì‘ë‹µì—ì„œ PlayerModel ìƒì„±
+                    PlayerModel playerModel = new PlayerModel("")
+                    {
+                        metal = Convert.ToInt32(responseData["metal"]),
+                        crystal = Convert.ToInt32(responseData["crystal"]),
+                        deuterium = Convert.ToInt32(responseData["deuterium"])
+                    };
+
+                    onSuccess?.Invoke(playerModel); //PlayerModel ë°˜í™˜
+                    Debug.Log("Login successful");
+                }
+                catch (Exception ex)
                 {
                     Debug.LogError($"Error processing login response: {ex.Message}");
                 }
